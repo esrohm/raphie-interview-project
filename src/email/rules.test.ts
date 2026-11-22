@@ -21,7 +21,7 @@ test('greeting and sign-off are their own sentences', () => {
 });
 
 test('flags em dashes', () => {
-  assert.deepEqual(rulesHit('Hi Jane,\nWe help teams — a lot.'), ['em_dash']);
+  assert.deepEqual(rulesHit('Hi Jane,\nWe help teams \u2014 a lot.'), ['em_dash']);
 });
 
 test('allows hyphens and en dashes', () => {

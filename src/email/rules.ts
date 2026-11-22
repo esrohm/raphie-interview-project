@@ -7,7 +7,14 @@ const MAX_EXCLAMATIONS = 1;
 const BANNED_OPENERS = ['furthermore', 'additionally'];
 
 export type RuleId =
-  'em_dash' | 'banned_opener' | 'banned_word' | 'too_many_exclamations' | 'repeated_opener' | 'long_sentence';
+  | 'em_dash'
+  | 'banned_opener'
+  | 'banned_word'
+  | 'too_many_exclamations'
+  | 'repeated_opener'
+  | 'long_sentence'
+  | 'missing_recipient'
+  | 'missing_company';
 
 export interface Violation {
   rule: RuleId;
@@ -50,7 +57,7 @@ export function checkEmail(email: string): Violation[] {
   const violations: Violation[] = [];
   const sentences = splitSentences(email);
 
-  if (email.includes('—')) {
+  if (email.includes('\u2014')) {
     violations.push({
       rule: 'em_dash',
       message: 'Contains an em dash. Use a comma, period, or colon instead.',
@@ -102,5 +109,32 @@ export function checkEmail(email: string): Violation[] {
     prevSentence = sentence;
   }
 
+  return violations;
+}
+
+/**
+ * The brief requires the recipient's name and the company's name. The model
+ * nearly always includes them, but "nearly always" isn't good enough for
+ * something that goes out to real prospects. Case-insensitive so "BIG BET
+ * SPORTS" typed into the CLI still matches "Big Bet Sports" in the email.
+ */
+export function checkRequiredContent(
+  email: string,
+  expected: { firstName: string; companyName: string },
+): Violation[] {
+  const lower = email.toLowerCase();
+  const violations: Violation[] = [];
+  if (!lower.includes(expected.firstName.toLowerCase())) {
+    violations.push({
+      rule: 'missing_recipient',
+      message: `Doesn't greet the recipient by name ("${expected.firstName}").`,
+    });
+  }
+  if (!lower.includes(expected.companyName.toLowerCase())) {
+    violations.push({
+      rule: 'missing_company',
+      message: `Never mentions the company by its full name ("${expected.companyName}").`,
+    });
+  }
   return violations;
 }
