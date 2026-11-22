@@ -24,6 +24,28 @@ npm start -- --name "Jane Doe" --company "Riverline Sportsbook" \
   --description "A sportsbook operator with high withdrawal volume and KYC questions" --tone direct
 ```
 
+Here's a real run (brief example #1, warm tone), copied as is:
+
+```
+Looking up Riverline Sportsbook...
+Found Riverline Sportsbook (operator, igaming), confidence 0.78.
+Writing the email with gpt-5.4-mini...
+
+Hi Jane,
+
+I’m reaching out from Raphie. We help sportsbook support teams automate workflows around withdrawals, KYC, promo checks, and account access.
+
+Riverline Sportsbook likely sees the same patterns every week, then bigger surges on big game days. That makes support automation a good fit, because repetitive player questions can be deflected before they hit the queue. It also helps your team resolve common issues faster and keeps agents focused on withdrawal reviews and other sensitive cases.
+
+Raphie handles policy-aware replies and clean escalation paths when a case needs human review. The goal is to reduce ticket volume without losing control of the process.
+
+Would you be open to a short call next week to see if this could help?
+
+Warm regards, Raphie
+
+Passed all checks.
+```
+
 Status messages go to stderr and only the email goes to stdout, so `npm start -s -- ... | pbcopy` gets you just the email.
 
 Add `--show-prompt` to see the per-email part of the prompt, i.e. the angle picked for the company type and whatever helper data made it past the confidence check. It's the quickest way to see why two companies got different emails. `DEBUG=1` prints the raw helper response.
@@ -31,8 +53,6 @@ Add `--show-prompt` to see the per-email part of the prompt, i.e. the angle pick
 Exit codes: 0 means it's good to send, 2 means it printed a draft that still breaks a rule (it tells you which), 1 is an error, 130 is cancelled.
 
 Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, and `npm run check`, which runs all of them (it's what CI runs).
-
-`bash scripts/demo-backup.sh` runs a handful of real examples (both tones, a low-confidence company, `--show-prompt`, the raw helper response, the eval, and the checks) and saves it all to `demo-backup.txt`. Handy as a smoke test that the key and endpoint still work.
 
 ### Eval
 
@@ -94,3 +114,13 @@ The cutoffs are judgment calls. A couple of things I noticed while testing:
 - Let the user see and edit the draft in the CLI and regenerate with feedback ("shorter", "mention the World Cup").
 - Batch mode from a CSV, since nobody sends one cold email at a time.
 - Subject lines.
+
+## Considered but skipped
+
+- zod for validating the helper response and env. There are only two small shapes, and the helper parsing needed custom handling for `"tbd"`/`"n/a"` anyway, so hand-written checks were less code. Worth adding if more external inputs show up.
+- Asking the model for structured JSON (greeting, paragraphs, sign-off) instead of plain text. It would make formatting more predictable, but the rules check the final text either way, and plain text kept the prompt and repair loop simpler.
+- Letting the model classify the company type. It'd handle odd descriptions better than keywords, but it's another call (a few more seconds) and another thing that can be wrong. Keywords plus the helper as a fallback covered every case I tried.
+- `Intl.Segmenter` for sentence splitting. It's built into Node, but the regex is easier to reason about, and when it's wrong it splits too often, which only makes the checks stricter.
+- Retrying helper timeouts. A slow response retried is just a second slow response, so a timeout falls back to the description right away. Only 503s get retried.
+- Enforcing the value props and cliché list as hard rules. The same idea can be worded too many ways, so it'd flag good emails. Those live in the prompt and get measured by the eval instead.
+- TypeScript 7. typescript-eslint doesn't support it yet, so it's pinned to 6.0 for now.
