@@ -53,6 +53,16 @@ test('segment falls back to the helper when the description is vague', () => {
   assert.equal(inferSegment('A fast growing company in Malta', NONE), 'unknown');
 });
 
+test('a medium-confidence helper guess does not decide the segment', () => {
+  // live run: "A small company based in Malta" at 0.41 got an email saying
+  // "we help B2B suppliers like Lumen Labs" as if it were known
+  assert.equal(inferSegment('A small company based in Malta', MEDIUM), 'unknown');
+  // but the guess still shows up in the hedged research section
+  const { input } = buildPrompt({ ...riverline, description: 'A small company based in Malta' }, MEDIUM);
+  assert.match(input, /Angle: The type of company is not clear/);
+  assert.match(input, /moderate confidence[\s\S]*Company type: operator/);
+});
+
 test('tone controls the guidance and sign-off', () => {
   assert.match(buildPrompt(riverline, NONE).instructions, /Sign off exactly with: Best, Raphie/);
   assert.match(

@@ -66,3 +66,9 @@ test('high tier keeps crypto when it is true', () => {
   assert.equal(ctx.facts.isCryptoRelated, true);
   assert.equal(ctx.facts.kycAmlIntensity, undefined);
 });
+
+test('KYC intensity is matched case-insensitively', () => {
+  const ctx = toGtmContext({ ...base, kycAmlIntensity: 'High' });
+  if (ctx.tier !== 'high') return assert.fail('expected high tier');
+  assert.equal(ctx.facts.kycAmlIntensity, 'high');
+});

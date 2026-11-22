@@ -65,13 +65,16 @@ const HELPER_TYPE_TO_SEGMENT: Record<string, Segment> = {
  * The description wins when it clearly says what the company is. A person
  * wrote it, and the helper sometimes gets this wrong (it called ApexPay, a
  * payments provider, a "platform" even at 0.8 confidence). The helper only
- * breaks the tie when the description is vague.
+ * breaks the tie when the description is vague, and only at high confidence.
+ * The segment angle is written as fact ("This is a B2B supplier..."), so a
+ * medium-confidence guess here ends up stated flatly in the email. At medium
+ * the company type still reaches the prompt, just in the hedged research part.
  */
 export function inferSegment(description: string, gtm: GtmContext): Segment {
   for (const [segment, pattern] of SEGMENT_KEYWORDS) {
     if (pattern.test(description)) return segment;
   }
-  if (gtm.tier !== 'none' && gtm.facts.companyType) {
+  if (gtm.tier === 'high' && gtm.facts.companyType) {
     return HELPER_TYPE_TO_SEGMENT[gtm.facts.companyType.toLowerCase()] ?? 'unknown';
   }
   return 'unknown';

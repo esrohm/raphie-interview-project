@@ -8,11 +8,14 @@ function replaceEmDashes(text: string): string {
   return text.replace(/\s*\u2014\s*/g, ', ');
 }
 
-// "Furthermore, we also..." -> "We also..."
+// "Furthermore, we also..." -> "We also...". Matches the same sentence starts
+// the checker does (after a closing quote or paren, or behind a bullet),
+// otherwise the checker flags something this can't clean up.
 function dropBannedOpeners(text: string): string {
   return text.replace(
-    /(^|[.!?]\s+|\n)(?:furthermore|additionally),?\s+(\w)/gim,
-    (_match, before: string, nextChar: string) => `${before}${nextChar.toUpperCase()}`,
+    /(^|[.!?]["'”’)\]]*\s+|\n)([-•*]\s+)?(?:furthermore|additionally),?\s+(\w)/gim,
+    (_match, before: string, bullet: string | undefined, nextChar: string) =>
+      `${before}${bullet ?? ''}${nextChar.toUpperCase()}`,
   );
 }
 

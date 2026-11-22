@@ -34,3 +34,14 @@ test('output passes the rules it is responsible for', () => {
   const rules = checkEmail(applyMechanicalFixes(messy)).map((v) => v.rule);
   assert.deepEqual(rules, []);
 });
+
+test('drops banned openers behind a bullet or after a closing quote', () => {
+  assert.equal(
+    applyMechanicalFixes('We help with:\n- Additionally, we route tickets.'),
+    'We help with:\n- We route tickets.',
+  );
+  assert.equal(
+    applyMechanicalFixes('They said "fast." Furthermore it works.'),
+    'They said "fast." It works.',
+  );
+});

@@ -96,3 +96,22 @@ test('call ask accepts the usual wordings', () => {
     assert.deepEqual(rules, [], ask);
   }
 });
+
+test('names have to appear as whole words', () => {
+  // "Sam" inside "same" and "Al" inside "also" used to count as greeting them
+  const rulesFor = (email: string, firstName: string) =>
+    checkRequiredContent(email, { firstName, companyName: 'Big Bet Sports' }).map((v) => v.rule);
+  assert.deepEqual(rulesFor('Hello. Big Bet Sports has the same issues. Quick call?', 'Sam'), [
+    'missing_recipient',
+  ]);
+  assert.deepEqual(rulesFor('Hello. We also help Big Bet Sports. Quick call?', 'Al'), ['missing_recipient']);
+  assert.deepEqual(rulesFor('Hi José, Big Bet Sports looks busy. Quick call?', 'José'), []);
+});
+
+test('curly apostrophes and case still count as the company name', () => {
+  const rules = checkRequiredContent('Hi Jane, BOB’S BETS is busy. Quick call?', {
+    firstName: 'Jane',
+    companyName: "Bob's Bets",
+  }).map((v) => v.rule);
+  assert.deepEqual(rules, []);
+});

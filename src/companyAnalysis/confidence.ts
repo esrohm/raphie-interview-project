@@ -84,8 +84,9 @@ export function toGtmContext(analysis: CompanyAnalysis | null): GtmContext {
       // "not crypto related" doesn't give the email anything to say, so we
       // only pass this along when it's true
       isCryptoRelated: analysis.isCryptoRelated === true ? true : undefined,
-      // same idea, low KYC intensity isn't a selling point
-      kycAmlIntensity: analysis.kycAmlIntensity === 'high' ? 'high' : undefined,
+      // same idea, low KYC intensity isn't a selling point. Lowercased first
+      // since nothing promises the endpoint won't send "High".
+      kycAmlIntensity: analysis.kycAmlIntensity?.toLowerCase() === 'high' ? 'high' : undefined,
     },
   };
 }

@@ -126,6 +126,25 @@ export function checkEmail(email: string): Violation[] {
   return violations;
 }
 
+// Case, curly apostrophes and extra spaces shouldn't decide whether a name
+// "appears": the model writes Bob’s Bets when the user typed Bob's Bets.
+function normalizeForMatch(text: string): string {
+  return text.toLowerCase().replace(/’/g, "'").replace(/\s+/g, ' ');
+}
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Whole-word match, so "Sam" doesn't count as present just because the email
+// says "same". Uses unicode letter classes instead of \b, which treats
+// accented letters as word breaks and would never match "José,".
+function containsPhrase(haystack: string, phrase: string): boolean {
+  const pattern = new RegExp(
+    `(?<![\\p{L}\\p{N}])${escapeRegExp(normalizeForMatch(phrase))}(?![\\p{L}\\p{N}])`,
+    'u',
+  );
+  return pattern.test(normalizeForMatch(haystack));
+}
+
 /**
  * The brief requires the recipient's name and the company's name. The model
  * nearly always includes them, but "nearly always" isn't good enough for
@@ -136,15 +155,14 @@ export function checkRequiredContent(
   email: string,
   expected: { firstName: string; companyName: string },
 ): Violation[] {
-  const lower = email.toLowerCase();
   const violations: Violation[] = [];
-  if (!lower.includes(expected.firstName.toLowerCase())) {
+  if (!containsPhrase(email, expected.firstName)) {
     violations.push({
       rule: 'missing_recipient',
       message: `Doesn't greet the recipient by name ("${expected.firstName}").`,
     });
   }
-  if (!lower.includes(expected.companyName.toLowerCase())) {
+  if (!containsPhrase(email, expected.companyName)) {
     violations.push({
       rule: 'missing_company',
       message: `Never mentions the company by its full name ("${expected.companyName}").`,
