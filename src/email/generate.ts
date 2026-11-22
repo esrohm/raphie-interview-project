@@ -1,6 +1,6 @@
 import type { GtmContext } from '../companyAnalysis/confidence.ts';
 import { applyMechanicalFixes } from './fixes.ts';
-import { buildPrompt, firstName, type EmailRequest, type Prompt } from './prompt.ts';
+import { buildPrompt, firstName, TONE_GUIDES, type EmailRequest, type Prompt } from './prompt.ts';
 import { checkEmail, checkRequiredContent, type Violation } from './rules.ts';
 
 // Anything that can turn a prompt into text. The OpenAI version lives in
@@ -32,6 +32,19 @@ export function cleanModelOutput(text: string): string {
     .trim();
 }
 
+/**
+ * The prompt asks for the sign-off on one line, but the model splits it
+ * ("Warm regards,\nRaphie") maybe one time in five. Not worth a repair round,
+ * so just put it back the way every other email looks.
+ */
+export function normalizeSignOff(email: string, signOff: string): string {
+  // keep whatever spacing came before the sign-off, only fix the sign-off itself
+  return email.replace(
+    /(\n\s*)(?:best|warm regards|regards|thanks|cheers),?\s*\n\s*raphie\.?\s*$/i,
+    (_match, before: string) => `${before}${signOff}`,
+  );
+}
+
 function repairPrompt(original: Prompt, draft: string, violations: Violation[]): Prompt {
   return {
     instructions: original.instructions,
@@ -57,13 +70,15 @@ export async function generateEmail(
   const prompt = buildPrompt(req, gtm);
   const expected = { firstName: firstName(req.recipientName), companyName: req.companyName };
   const findViolations = (email: string) => [...checkEmail(email), ...checkRequiredContent(email, expected)];
+  const { signOff } = TONE_GUIDES[req.tone];
+  const tidy = (raw: string) => normalizeSignOff(cleanModelOutput(raw), signOff);
 
-  let email = cleanModelOutput(await model.complete(prompt));
+  let email = tidy(await model.complete(prompt));
   let violations = findViolations(email);
   let attempts = 1;
 
   while (violations.length > 0 && attempts <= MAX_REPAIRS) {
-    email = cleanModelOutput(await model.complete(repairPrompt(prompt, email, violations)));
+    email = tidy(await model.complete(repairPrompt(prompt, email, violations)));
     violations = findViolations(email);
     attempts++;
   }

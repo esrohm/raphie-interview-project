@@ -42,6 +42,10 @@ npm run eval -- --show       # print the emails too
 
 It makes real API calls, so it's not part of `check` or CI.
 
+Last few runs on gpt-5.4-mini: 24 emails, all passed the rules on the first draft, so the repair loop hasn't actually had to kick in yet. It's there for when it does (different model, longer descriptions, etc). One run had the helper fail and the fallback still wrote a fine email from the description.
+
+Reading through them is what caught the softer stuff the rules don't check. Three of six emails described the company as "sitting in a support-heavy spot", a warm email opened with "Thanks for taking a look" (they haven't looked at anything, it's a cold email), and the model sometimes swapped em dashes for comma splices. Those are all prompt tweaks now. The sign-off sometimes got split over two lines too, which is just normalized in code.
+
 ## How it works
 
 1. Look up the company on the helper endpoint (20s timeout, 503s get retried twice with backoff).

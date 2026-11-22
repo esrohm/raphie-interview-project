@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { GtmContext } from '../companyAnalysis/confidence.ts';
-import { cleanModelOutput, generateEmail, type TextModel } from './generate.ts';
+import { cleanModelOutput, generateEmail, normalizeSignOff, type TextModel } from './generate.ts';
 import type { EmailRequest, Prompt } from './prompt.ts';
 
 const req: EmailRequest = {
@@ -81,4 +81,23 @@ test('model errors propagate instead of being swallowed', async () => {
 test('cleanModelOutput strips code fences and subject lines', () => {
   assert.equal(cleanModelOutput('```\nHi Jane,\nHello.\n```'), 'Hi Jane,\nHello.');
   assert.equal(cleanModelOutput('Subject: Quick question\n\nHi Jane,'), 'Hi Jane,');
+});
+
+test('normalizeSignOff joins a split sign-off back onto one line', () => {
+  assert.equal(
+    normalizeSignOff('Thanks for reading.\n\nWarm regards,\nRaphie', 'Warm regards, Raphie'),
+    // the blank line before the sign-off stays put
+    'Thanks for reading.\n\nWarm regards, Raphie',
+  );
+  assert.equal(normalizeSignOff('Call?\nBest,\n  Raphie.', 'Best, Raphie'), 'Call?\nBest, Raphie');
+  // already on one line, or not a sign-off at all: leave it alone
+  assert.equal(normalizeSignOff('Call?\nBest, Raphie', 'Best, Raphie'), 'Call?\nBest, Raphie');
+  assert.equal(normalizeSignOff('We love Raphie', 'Best, Raphie'), 'We love Raphie');
+});
+
+test('generateEmail normalizes the sign-off to match the tone', async () => {
+  const split = GOOD.replace('Best, Raphie', 'Best,\nRaphie');
+  const { model } = fakeModel([split]);
+  const result = await generateEmail(req, gtm, model);
+  assert.equal(result.email, GOOD);
 });

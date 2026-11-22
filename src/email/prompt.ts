@@ -85,7 +85,7 @@ const SEGMENT_ANGLES: Record<Segment, string> = {
     'The type of company is not clear. Stay grounded in what the description says and keep the pitch general: deflecting repetitive tickets, faster resolution, helping agents.',
 };
 
-const TONE_GUIDES: Record<Tone, { guide: string; signOff: string }> = {
+export const TONE_GUIDES: Record<Tone, { guide: string; signOff: string }> = {
   direct: {
     guide:
       'Direct: get to the point in the first sentence after the greeting. No small talk. Confident and plain, around 90 to 130 words.',
@@ -93,7 +93,7 @@ const TONE_GUIDES: Record<Tone, { guide: string; signOff: string }> = {
   },
   warm: {
     guide:
-      'Warm: open with one short friendly line, then get into it. Conversational and human, never gushing. Around 110 to 150 words.',
+      "Warm: open with one short friendly line, then get into it. It's a cold email, so the opener can't assume they know us or have read anything. Conversational and human, never gushing. Around 110 to 150 words.",
     signOff: 'Warm regards, Raphie',
   },
 };
@@ -192,7 +192,7 @@ Every email must:
 - Sign off exactly with: ${tone.signOff}
 
 Hard rules. Breaking any of these means the email gets thrown out:
-- Never use em dashes. Use commas, periods, or colons instead.
+- Never use em dashes. Split the thought into two sentences or use a colon. Don't just swap in a comma, that makes a run-on.
 - Never start a sentence with "Furthermore" or "Additionally".
 - Never use the word "fantastic".
 - No more than one exclamation mark in the whole email. Zero is better.
@@ -200,6 +200,7 @@ Hard rules. Breaking any of these means the email gets thrown out:
 - Keep every sentence under 25 words.
 
 Avoid the usual cold email clichés: "I hope this email finds you well", "in today's fast-paced world", "game-changer", "revolutionize", "leverage", "seamless".
+Also avoid stock framings like "X sits in a support-heavy spot" or "X sits right in the middle of". Say the specific thing about their support instead.
 Do not invent numbers, customers, or results.
 
 Tone:
