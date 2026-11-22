@@ -6,7 +6,7 @@ import { toGtmContext, type GtmContext } from './companyAnalysis/confidence.ts';
 import { loadConfig } from './config.ts';
 import { generateEmail } from './email/generate.ts';
 import { createOpenAIModel } from './email/openaiModel.ts';
-import type { EmailRequest } from './email/prompt.ts';
+import { buildPrompt, type EmailRequest } from './email/prompt.ts';
 import {
   parseCompanyName,
   parseDescription,
@@ -27,6 +27,8 @@ Asks for anything you don't pass as a flag.
   --company      company name, e.g. "Big Bet Sports"
   --description  short description of the company
   --tone         direct | warm
+  --show-prompt  also print the per-email part of the prompt (what the
+                 model gets told about this company)
   -h, --help     show this message`;
 
 // exit codes, so a script calling this can tell "worked" from "worked but
@@ -106,6 +108,7 @@ async function main(): Promise<number> {
       company: { type: 'string' },
       description: { type: 'string' },
       tone: { type: 'string' },
+      'show-prompt': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
@@ -161,6 +164,15 @@ async function main(): Promise<number> {
   const lookup = await fetchCompanyAnalysis(req.companyName);
   const gtm = toGtmContext(lookup.ok ? lookup.analysis : null);
   log(describeLookup(req.companyName, lookup, gtm));
+
+  if (flags['show-prompt']) {
+    // Only the per-email half. The instructions (rules, tone guide, style
+    // examples) are the same every time and would just bury the interesting
+    // part, which is how the description and helper data got turned into
+    // guidance. generateEmail builds the same prompt internally, it's pure.
+    const divider = '-'.repeat(60);
+    log(`\n${divider}\nPrompt input:\n\n${buildPrompt(req, gtm).input}\n${divider}\n`);
+  }
 
   log(`Writing the email with ${config.openaiModel}...`);
   const model = createOpenAIModel({ apiKey: config.openaiApiKey, model: config.openaiModel });

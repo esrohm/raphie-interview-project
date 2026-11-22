@@ -152,7 +152,8 @@ function describeGtm(gtm: GtmContext): string {
       'Background research (moderate confidence, treat these as educated guesses):',
       ...lines.map((l) => `- ${l}`),
       'Only use these where they agree with the description. If anything conflicts, trust the description.',
-      'Phrase anything from here softly ("teams like yours often see..."), never as a stated fact about them.',
+      // no example phrase here on purpose: the model copied it word for word
+      'Phrase anything from here as a likely pattern for companies like them, in your own words, never as a stated fact about them.',
     ].join('\n');
   }
 
@@ -210,6 +211,7 @@ Here are two emails in the style we want. Use them for voice and structure only.
 
 ${STYLE_EXAMPLES.map((e, i) => `Example ${i + 1}:\n${e}`).join('\n\n')}
 
+Put a blank line between the greeting, each paragraph, and the sign-off.
 Reply with the email text only: no subject line, no notes, no markdown.`;
 
   const research = describeGtm(gtm);

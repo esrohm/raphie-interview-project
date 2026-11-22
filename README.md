@@ -4,7 +4,7 @@ Small CLI that writes cold outreach emails for Raphie. You give it a recipient, 
 
 ## Setup
 
-Needs Node 22+ (there's an `.nvmrc`). Node runs the TypeScript directly, so there's no build step.
+Needs Node 22.18 or newer (there's an `.nvmrc`). That's the version where Node started running TypeScript directly without a flag, so there's no build step.
 
 ```
 npm install
@@ -26,13 +26,17 @@ npm start -- --name "Jane Doe" --company "Riverline Sportsbook" \
 
 Status messages go to stderr and only the email goes to stdout, so `npm start -s -- ... | pbcopy` gets you just the email.
 
+Add `--show-prompt` to see the per-email part of the prompt, i.e. the angle picked for the company type and whatever helper data made it past the confidence check. It's the quickest way to see why two companies got different emails. `DEBUG=1` prints the raw helper response.
+
 Exit codes: 0 means it's good to send, 2 means it printed a draft that still breaks a rule (it tells you which), 1 is an error, 130 is cancelled.
 
 Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, and `npm run check`, which runs all of them (it's what CI runs).
 
+`bash scripts/demo-backup.sh` runs a handful of real examples (both tones, a low-confidence company, `--show-prompt`, the raw helper response, the eval, and the checks) and saves it all to `demo-backup.txt`. Handy as a smoke test that the key and endpoint still work.
+
 ### Eval
 
-The unit tests use a fake model, so they can't tell you if a prompt change made the emails better or worse. `npm run eval` runs six company profiles (both brief examples, the brief's CLI example, a B2B supplier, an affiliate, and a deliberately vague one) through the real helper and OpenAI, and prints a table: helper tier, detected segment, how many drafts it took, word counts, and any rules still broken.
+The unit tests use a fake model, so they can't tell you if a prompt change made the emails better or worse. `npm run eval` runs six company profiles (both brief examples, the brief's CLI example, a B2B supplier, an affiliate, and a deliberately vague one) through the real helper and OpenAI, and prints a table: helper tier, detected segment, how many drafts it took, word counts, value prop coverage, and any rules still broken.
 
 ```
 npm run eval                 # one run per case
@@ -44,12 +48,12 @@ It makes real API calls, so it's not part of `check` or CI.
 
 What I saw running it:
 
-- gpt-5.4-mini almost always passes the rules on the first draft. Across about 36 emails, one needed a repair round and it fixed it.
+- gpt-5.4-mini almost always passes the rules on the first draft. Across about 60 emails, two needed a repair round and both got fixed.
 - To make sure the repair loop actually works against a real model and not just the fake one in the tests, I ran it with `OPENAI_MODEL=gpt-5.4-nano`. 5 of 12 first drafts broke a rule and the repair round fixed all 5.
 - One run had the helper fail outright and the fallback still wrote a fine email from the description.
 - The table also has a rough keyword check for the four value props the brief asks for (automation, resolution time, deflection, helping agents). Early on about one email in four skipped resolution time, because the prompt listed them like a menu. After saying they're all required it's 10 to 12 out of 12. It's only an eval signal, not a rule in the app, since the same idea can be worded too many ways.
 
-Reading through the emails is what caught the softer stuff the rules don't check. Three of six described the company as "sitting in a support-heavy spot", a warm one opened with "Thanks for taking a look" (it's a cold email, they haven't looked at anything), and the model sometimes swapped em dashes for comma splices. Those are all prompt tweaks now. The sign-off sometimes got split over two lines too, which is just normalized in code.
+Reading through the emails is what caught the softer stuff the rules don't check. Three of six described the company as "sitting in a support-heavy spot", a warm one opened with "Thanks for taking a look" (it's a cold email, they haven't looked at anything), the model sometimes swapped em dashes for comma splices, and when the prompt gave an example of how to hedge a guess, it pasted that exact phrase into every medium-confidence email. Those are all prompt tweaks now. The sign-off sometimes got split over two lines too, which is just normalized in code.
 
 ## How it works
 

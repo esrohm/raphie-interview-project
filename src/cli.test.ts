@@ -73,3 +73,7 @@ test('a bad answer re-prompts instead of failing', () => {
   assert.equal(stderr.match(/Tone \(direct \/ warm\): /g)?.length, 2);
   assert.match(stderr, /Tone has to be "direct" or "warm"/);
 });
+
+test('--help documents --show-prompt', () => {
+  assert.match(run(['--help']).stderr, /--show-prompt/);
+});

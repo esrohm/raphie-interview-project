@@ -16,7 +16,7 @@
   "license": "ISC",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "dependencies": {
     "openai": "^7.62.0"
