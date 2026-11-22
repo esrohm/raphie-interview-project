@@ -56,7 +56,7 @@ Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, and `npm run che
 
 ### Eval
 
-The unit tests use a fake model, so they can't tell you if a prompt change made the emails better or worse. `npm run eval` runs six company profiles (both brief examples, the brief's CLI example, a B2B supplier, an affiliate, and a deliberately vague one) through the real helper and OpenAI, and prints a table: helper tier, detected segment, how many drafts it took, word counts, value prop coverage, and any rules still broken.
+The unit tests use a fake model, so they can't tell you if a prompt change made the emails better or worse. `npm run eval` runs seven company profiles (both brief examples, the brief's CLI example, a B2B supplier, an affiliate, a risk/compliance vendor, and a deliberately vague one) through the real helper and OpenAI, and prints a table: helper tier, detected segment, how many drafts it took, word counts, value prop coverage, and any rules still broken.
 
 ```
 npm run eval                 # one run per case

@@ -21,20 +21,31 @@ export interface Prompt {
 // withdrawals, game day spikes) look nothing like an affiliate's.
 export type Segment = 'operator' | 'supplier' | 'affiliate' | 'payments' | 'unknown';
 
-// Checked in order, and order matters: "a payments provider for iGaming
-// operators" mentions operators, but it's obviously a payments company.
-// Same for "a platform that powers sportsbooks".
+// Checked in order, and order matters. B2B companies describe themselves by
+// who they sell to ("a fraud vendor for sportsbooks", "a KYC platform used by
+// operators"), so mentioning operators doesn't make you one. Anything that
+// sounds like it *serves* operators gets caught as a supplier before the
+// operator keywords get a chance.
+const OPERATOR_WORDS = '(operators?|sportsbooks?|casinos?|bookmakers?|brands|igaming)';
+
 const SEGMENT_KEYWORDS: Array<[Segment, RegExp]> = [
   ['payments', /\b(payments?|psp|payouts? provider|processor|acquir\w*|on-?ramps?|e-?wallets?)\b/i],
   ['affiliate', /\b(affiliates?|comparison site|review site|tipsters?|lead gen\w*|media brand)\b/i],
   [
     'supplier',
-    /\b(b2b|suppliers?|platform provider|white[- ]label|aggregator|odds (feed|provider)|data provider|game (studio|provider)|kyc provider|risk (vendor|platform)|compliance (vendor|platform)|powers)\b/i,
+    /\b(b2b|suppliers?|vendors?|tooling|saas|white[- ]label|aggregator|odds (feed|provider)|data provider|game (studio|provider)|powers|powering)\b/i,
+  ],
+  // "for US sportsbooks", "serving online casinos", "used by iGaming operators"
+  [
+    'supplier',
+    new RegExp(`\\b(for|serving|used by|sold to|licensed to)\\s+(\\S+\\s+){0,2}${OPERATOR_WORDS}\\b`, 'i'),
   ],
   [
     'operator',
     /\b(sportsbooks?|casinos?|operators?|bookmakers?|betting (app|site|brand)|lotter(y|ies)|igaming brand)\b/i,
   ],
+  // weak signals, only used when nothing above matched
+  ['supplier', /\b(provider|platform|software|solutions?|api)\b/i],
 ];
 
 // The helper's labels don't map 1:1 onto ours ("platform" covers a lot), so

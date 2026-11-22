@@ -72,6 +72,19 @@ const CASES: Array<{ label: string; req: EmailRequest }> = [
     },
   },
   {
+    // the brief lists risk/compliance as part of the market, and these are
+    // easy to misread as operators since they describe themselves by their
+    // sportsbook customers
+    label: 'risk/compliance vendor',
+    req: {
+      recipientName: 'Dana Whitfield',
+      companyName: 'Sentinel Risk',
+      description:
+        'A fraud and risk scoring vendor for US sportsbooks, handling operator tickets about flagged accounts, false positives, and review turnaround',
+      tone: 'direct',
+    },
+  },
+  {
     label: 'vague description',
     req: {
       recipientName: 'Sam Ortiz',

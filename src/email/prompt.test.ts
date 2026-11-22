@@ -94,3 +94,26 @@ test('firstName handles extra whitespace', () => {
   assert.equal(firstName('  Alex   Gould '), 'Alex');
   assert.equal(firstName('Cher'), 'Cher');
 });
+
+test('B2B vendors that mention who they sell to are suppliers, not operators', () => {
+  // these all mention sportsbooks/casinos/operators as customers, and used to
+  // get classified as operators because of it
+  for (const description of [
+    'A fraud and risk scoring vendor for sportsbooks',
+    'A compliance and responsible gambling tooling company serving online casinos',
+    'A KYC and identity verification platform used by iGaming operators',
+    'A geolocation compliance provider for US sportsbooks',
+  ]) {
+    assert.equal(inferSegment(description, NONE), 'supplier', description);
+  }
+});
+
+test('operators that mention platforms or customers are still operators', () => {
+  for (const description of [
+    'A US sportsbook running its own in-house platform',
+    'A casino operator for players in New Jersey',
+    'A betting app for UK punters',
+  ]) {
+    assert.equal(inferSegment(description, NONE), 'operator', description);
+  }
+});
