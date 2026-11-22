@@ -2,15 +2,32 @@
   "name": "raphie-code-challenge",
   "version": "1.0.0",
   "description": "CLI that drafts Raphie cold outreach emails",
-  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test",
+    "typecheck": "tsc",
+    "start": "node --env-file-if-exists=.env src/cli.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
   },
-  "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "module",
   "engines": {
     "node": ">=22"
-  }
+  },
+  "dependencies": {
+    "openai": "^7.62.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
+    "eslint": "^10.15.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0",
+    "typescript-eslint": "^8.73.0"
+  },
+  "private": true
 }
