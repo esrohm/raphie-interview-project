@@ -113,6 +113,10 @@ export async function fetchCompanyAnalysis(
       return { ok: false, reason: `endpoint returned ${res.status}` };
     }
 
+    // handy when the helper sends back something odd, run with DEBUG=1 to see it
+    const raw = await res.text();
+    if (process.env.DEBUG) console.error('[company-analysis] raw response:', raw);
+
     let body: unknown;
     try {
       body = await res.json();
