@@ -187,7 +187,7 @@ Every email must:
 - Greet the recipient by first name ("Hi <first name>,").
 - Mention the company by its full name at least once.
 - Say why this company's space is a strong fit for support automation, based on what we know about them.
-- Make Raphie's value clear: automating support workflows, faster resolution, deflecting repetitive tickets, and helping agents.
+- Make Raphie's value clear by touching on all four of these, even briefly: automating support workflows, faster resolution times, deflecting repetitive tickets, and helping agents. This is a checklist, not a menu to pick from.
 - End with a low-pressure ask for a short call.
 - Sign off exactly with: ${tone.signOff}
 

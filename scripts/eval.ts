@@ -91,10 +91,29 @@ interface RunReport {
   drafts: number;
   words: number;
   longestSentence: number;
+  valueProps: string;
   problems: string;
 }
 
 const countWords = (text: string) => text.split(/\s+/).filter(Boolean).length;
+
+// Rough keyword check for the four value props the brief wants in every
+// email. Deliberately NOT a hard rule in the app: the same idea can be said
+// too many ways, so it'd flag good emails. As an eval signal across a dozen
+// emails it's good enough to spot when one keeps getting dropped.
+const VALUE_PROPS: Array<[string, RegExp]> = [
+  ['automation', /automat/i],
+  // "faster" on its own covers both "faster answers" and "answers faster"
+  ['resolution', /resol|response time|faster|first response|handle time|move quickly/i],
+  ['deflection', /deflect|repetitive|repeat (tickets|questions)|routine/i],
+  ['agents', /\bagents?\b/i],
+];
+
+function valuePropCoverage(email: string): string {
+  const missing = VALUE_PROPS.filter(([, pattern]) => !pattern.test(email)).map(([name]) => name);
+  const covered = VALUE_PROPS.length - missing.length;
+  return missing.length === 0 ? `${covered}/4` : `${covered}/4 (no ${missing.join(', ')})`;
+}
 
 async function main(): Promise<number> {
   const { values } = parseArgs({
@@ -139,6 +158,7 @@ async function main(): Promise<number> {
           drafts: result.attempts,
           words: countWords(result.email),
           longestSentence: Math.max(...splitSentences(result.email).map(countWords)),
+          valueProps: valuePropCoverage(result.email),
           problems: result.status === 'needs_review' ? result.violations.map((v) => v.rule).join(', ') : '',
         });
       }
@@ -156,6 +176,8 @@ async function main(): Promise<number> {
     `\n${flat.length} emails: ${firstTry} clean on the first draft, ` +
       `${flat.length - firstTry - needsReview} fixed by repair, ${needsReview} still need review.`,
   );
+  const allValueProps = flat.filter((r) => r.valueProps === '4/4').length;
+  console.log(`${allValueProps}/${flat.length} cover all four value props.`);
 
   return needsReview > 0 ? 2 : 0;
 }

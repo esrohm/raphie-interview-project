@@ -42,9 +42,14 @@ npm run eval -- --show       # print the emails too
 
 It makes real API calls, so it's not part of `check` or CI.
 
-Last few runs on gpt-5.4-mini: 24 emails, all passed the rules on the first draft, so the repair loop hasn't actually had to kick in yet. It's there for when it does (different model, longer descriptions, etc). One run had the helper fail and the fallback still wrote a fine email from the description.
+What I saw running it:
 
-Reading through them is what caught the softer stuff the rules don't check. Three of six emails described the company as "sitting in a support-heavy spot", a warm email opened with "Thanks for taking a look" (they haven't looked at anything, it's a cold email), and the model sometimes swapped em dashes for comma splices. Those are all prompt tweaks now. The sign-off sometimes got split over two lines too, which is just normalized in code.
+- gpt-5.4-mini almost always passes the rules on the first draft. Across about 36 emails, one needed a repair round and it fixed it.
+- To make sure the repair loop actually works against a real model and not just the fake one in the tests, I ran it with `OPENAI_MODEL=gpt-5.4-nano`. 5 of 12 first drafts broke a rule and the repair round fixed all 5.
+- One run had the helper fail outright and the fallback still wrote a fine email from the description.
+- The table also has a rough keyword check for the four value props the brief asks for (automation, resolution time, deflection, helping agents). Early on about one email in four skipped resolution time, because the prompt listed them like a menu. After saying they're all required it's 10 to 12 out of 12. It's only an eval signal, not a rule in the app, since the same idea can be worded too many ways.
+
+Reading through the emails is what caught the softer stuff the rules don't check. Three of six described the company as "sitting in a support-heavy spot", a warm one opened with "Thanks for taking a look" (it's a cold email, they haven't looked at anything), and the model sometimes swapped em dashes for comma splices. Those are all prompt tweaks now. The sign-off sometimes got split over two lines too, which is just normalized in code.
 
 ## How it works
 
@@ -60,9 +65,9 @@ Code is split by area: `src/companyAnalysis/` is the endpoint client and confide
 
 The main idea is that a wrong detail is worse than a missing one. If we tell a payments company their players keep asking about bet settlement, they'll know it's a template right away. The description was written by a person who looked at the company, so it's treated as the source of truth and the helper fills in gaps.
 
-- **0.7 and up**: use everything useful, including regions and compliance themes. Still capped to a few items, and the model is told to only work in one or two.
-- **0.4 to 0.7**: only the broad stuff (company type, vertical, likely ticket drivers), framed as guesses, and the description wins on any conflict. The detailed fields are where a bad guess hurts most, so they're dropped.
-- **Below 0.4**: ignored completely. The prompt doesn't even mention it, because telling the model "we don't know much" makes it write vaguer filler.
+- 0.7 and up: use everything useful, including regions and compliance themes. Still capped to a few items, and the model is told to only work in one or two.
+- 0.4 to 0.7: only the broad stuff (company type, vertical, likely ticket drivers), framed as guesses, and the description wins on any conflict. The detailed fields are where a bad guess hurts most, so they're dropped.
+- Below 0.4: ignored completely. The prompt doesn't even mention it, because telling the model "we don't know much" makes it write vaguer filler.
 
 Some fields just get dropped as noise: `isCryptoRelated` only matters when it's true, and `kycAmlIntensity` only when it's high. Values like `"tbd"` and `"n/a"` are treated as missing.
 
