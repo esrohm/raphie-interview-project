@@ -56,7 +56,7 @@ Reading through the emails is what caught the softer stuff the rules don't check
 1. Look up the company on the helper endpoint (20s timeout, 503s get retried twice with backoff).
 2. Decide how much of the response to trust based on `confidence` (see below).
 3. Build the prompt. The biggest lever is what kind of company it is (operator, B2B supplier, affiliate, payments) since that changes who's actually filing their tickets. That comes from the description first and the helper's `companyType` only if the description is vague.
-4. Generate, then check the draft against the rules. If it breaks any, send it back to the model with the specific problems listed (max 2 times). If it still fails, apply the fixes that can be done safely in code (em dashes, banned openers, "fantastic", extra exclamation marks) and check again.
+4. Generate, then check the draft against the rules. On top of the style rules from the brief, it also checks the email actually has the recipient's first name, the full company name, and an ask for a call or meeting. If it breaks any, send it back to the model with the specific problems listed (max 2 times). If it still fails, apply the fixes that can be done safely in code (em dashes, banned openers, "fantastic", extra exclamation marks) and check again.
 5. Print it, or print it with a warning if something's still off.
 
 Code is split by area: `src/companyAnalysis/` is the endpoint client and confidence logic, `src/email/` is the prompt, rules, and generation loop, and `src/cli.ts` wires it together.
@@ -80,7 +80,7 @@ The cutoffs are judgment calls. A couple of things I noticed while testing:
 
 - Both example emails in the brief actually break the 30 word rule (they have 32 and 33 word sentences). The prompt uses trimmed versions as style references so the model doesn't pick up the habit, and there's a test making sure they pass.
 - The prompt asks for sentences under 25 words to leave some room under the real limit.
-- The sentence splitter is regex based and will miscount things like "e.g.", which seemed fine for short emails.
+- The sentence splitter is regex based. It handles sentences ending in quotes or parens, bullets, and curly apostrophes, but it'll still split on things like "e.g.", which seemed fine for short emails. Splitting too often only makes the checks stricter, never looser.
 
 ## With more time
 

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkEmail, splitSentences } from './rules.ts';
+import { checkEmail, checkRequiredContent, splitSentences } from './rules.ts';
 
 const rulesHit = (email: string) => checkEmail(email).map((v) => v.rule);
 
@@ -54,4 +54,45 @@ test('30 words is fine, 31 is not', () => {
   const sentence = (n: number) => `${Array.from({ length: n }, () => 'word').join(' ')}.`;
   assert.deepEqual(rulesHit(sentence(30)), []);
   assert.deepEqual(rulesHit(sentence(31)), ['long_sentence']);
+});
+
+test('catches a banned opener behind a bullet', () => {
+  assert.deepEqual(rulesHit('Hi Jane,\nWe help with:\n- Additionally, we route tickets.'), ['banned_opener']);
+  assert.deepEqual(rulesHit('Hi Jane,\n• Furthermore we route tickets.'), ['banned_opener']);
+});
+
+test('splits after a closing quote or paren', () => {
+  assert.deepEqual(splitSentences('We said "hello." We said it twice.'), [
+    'We said "hello."',
+    'We said it twice.',
+  ]);
+  assert.deepEqual(rulesHit('We help (a lot.) We also route.'), ['repeated_opener']);
+  assert.deepEqual(rulesHit('We said “hello.” We said it twice.'), ['repeated_opener']);
+});
+
+test('curly and straight apostrophes count as the same opener', () => {
+  assert.deepEqual(rulesHit("I’m from Raphie. I'm also here."), ['repeated_opener']);
+});
+
+const expected = { firstName: 'Jane', companyName: 'Riverline Sportsbook' };
+
+test('required content passes when everything is there', () => {
+  assert.deepEqual(checkRequiredContent(`${CLEAN}\nRiverline Sportsbook`, expected), []);
+});
+
+test('required content flags a missing name, company, or call ask', () => {
+  const rules = checkRequiredContent('Hello there. We automate tickets.', expected).map((v) => v.rule);
+  assert.deepEqual(rules, ['missing_recipient', 'missing_company', 'missing_call_ask']);
+});
+
+test('call ask accepts the usual wordings', () => {
+  for (const ask of [
+    'open to a short call?',
+    'Worth a quick chat?',
+    'Could we meet next week?',
+    'up for a short conversation?',
+  ]) {
+    const rules = checkRequiredContent(`Hi Jane, Riverline Sportsbook. ${ask}`, expected).map((v) => v.rule);
+    assert.deepEqual(rules, [], ask);
+  }
 });

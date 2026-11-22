@@ -14,7 +14,8 @@ export type RuleId =
   | 'repeated_opener'
   | 'long_sentence'
   | 'missing_recipient'
-  | 'missing_company';
+  | 'missing_company'
+  | 'missing_call_ask';
 
 export interface Violation {
   rule: RuleId;
@@ -29,22 +30,35 @@ export interface Violation {
  * email that I'd rather keep this simple than pull in an NLP library.
  */
 export function splitSentences(text: string): string[] {
-  return text
-    .split(/\n+/)
-    .flatMap((line) => line.split(/(?<=[.!?])\s+/))
-    .map((s) => s.trim())
-    .filter(Boolean);
+  return (
+    text
+      .split(/\n+/)
+      // the [...]* lets a sentence end in a closing quote or paren, like
+      // `"hello." We...` or `(a lot.) We...`, and still split there
+      .flatMap((line) => line.split(/(?<=[.!?]["'”’)\]]*)\s+/))
+      .map((s) => s.trim())
+      .filter(Boolean)
+  );
 }
 
 function words(sentence: string): string[] {
   return sentence.split(/\s+/).filter(Boolean);
 }
 
-// Lowercased first word with punctuation stripped, so "Raphie," and "Raphie"
-// count as the same opener.
+// Lowercased, punctuation stripped, and curly apostrophes straightened, so
+// "Raphie," and "Raphie" match, and so do "I’m" and "I'm" (the model uses
+// curly ones a lot).
+function normalizeWord(word: string): string {
+  return word
+    .toLowerCase()
+    .replace(/’/g, "'")
+    .replace(/[^a-z0-9']/g, '');
+}
+
+// First real word of the sentence. Skips list markers like "-" or "•" so a
+// bullet that starts with "Additionally" still gets caught.
 function firstWord(sentence: string): string {
-  const first = words(sentence)[0] ?? '';
-  return first.toLowerCase().replace(/[^a-z0-9']/g, '');
+  return words(sentence).map(normalizeWord).find(Boolean) ?? '';
 }
 
 function preview(sentence: string, max = 8): string {
@@ -86,7 +100,7 @@ export function checkEmail(email: string): Violation[] {
     if (BANNED_OPENERS.includes(opener)) {
       violations.push({
         rule: 'banned_opener',
-        message: `Sentence starts with "${words(sentence)[0]}": "${preview(sentence)}"`,
+        message: `Sentence starts with "${opener}": "${preview(sentence)}"`,
       });
     }
 
@@ -134,6 +148,14 @@ export function checkRequiredContent(
     violations.push({
       rule: 'missing_company',
       message: `Never mentions the company by its full name ("${expected.companyName}").`,
+    });
+  }
+  // Unlike the value props, the ask is pretty much always worded the same few
+  // ways, so a keyword check is reliable enough to enforce here.
+  if (!/\b(call|chat|meet|meeting|conversation|talk|demo)\b/i.test(email)) {
+    violations.push({
+      rule: 'missing_call_ask',
+      message: 'Never suggests meeting up or hopping on a short call.',
     });
   }
   return violations;
