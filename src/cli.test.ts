@@ -26,6 +26,7 @@ test('--help prints usage and exits 0', () => {
   const { code, stderr, stdout } = run(['--help']);
   assert.equal(code, 0);
   assert.match(stderr, /Usage: npm start/);
+  assert.match(stderr, /--show-prompt/);
   // stdout is reserved for the email
   assert.equal(stdout, '');
 });
@@ -45,12 +46,8 @@ test('missing API key fails before asking anything', () => {
 });
 
 test('an invalid flag value is an error, not a re-prompt', () => {
-  const { code, stderr } = run(
-    ['--name', 'Jane Doe', '--company', 'X', '--description', 'y', '--tone', 'loud'],
-    {
-      env: FAKE_KEY,
-    },
-  );
+  const flags = ['--name', 'Jane Doe', '--company', 'X', '--description', 'y', '--tone', 'loud'];
+  const { code, stderr } = run(flags, { env: FAKE_KEY });
   assert.equal(code, 1);
   assert.match(stderr, /Tone has to be "direct" or "warm"/);
 });
@@ -72,8 +69,4 @@ test('a bad answer re-prompts instead of failing', () => {
   assert.equal(code, 130);
   assert.equal(stderr.match(/Tone \(direct \/ warm\): /g)?.length, 2);
   assert.match(stderr, /Tone has to be "direct" or "warm"/);
-});
-
-test('--help documents --show-prompt', () => {
-  assert.match(run(['--help']).stderr, /--show-prompt/);
 });

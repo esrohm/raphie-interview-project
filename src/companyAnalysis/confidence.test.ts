@@ -26,16 +26,17 @@ test('no analysis means no helper context', () => {
   assert.equal(toGtmContext(null).tier, 'none');
 });
 
-test('0.15 is ignored, 0.85 is used in full (the example from the brief)', () => {
-  assert.equal(toGtmContext({ ...base, confidence: 0.15 }).tier, 'none');
-  assert.equal(toGtmContext({ ...base, confidence: 0.85 }).tier, 'high');
-});
-
-test('tier boundaries', () => {
-  assert.equal(toGtmContext({ ...base, confidence: 0.39 }).tier, 'none');
-  assert.equal(toGtmContext({ ...base, confidence: 0.4 }).tier, 'medium');
-  assert.equal(toGtmContext({ ...base, confidence: 0.69 }).tier, 'medium');
-  assert.equal(toGtmContext({ ...base, confidence: 0.7 }).tier, 'high');
+test('tier boundaries, including 0.15 vs 0.85 from the brief', () => {
+  for (const [confidence, tier] of [
+    [0.15, 'none'],
+    [0.39, 'none'],
+    [0.4, 'medium'],
+    [0.69, 'medium'],
+    [0.7, 'high'],
+    [0.85, 'high'],
+  ] as const) {
+    assert.equal(toGtmContext({ ...base, confidence }).tier, tier, String(confidence));
+  }
 });
 
 test('medium tier only passes the broad facts', () => {
@@ -60,15 +61,12 @@ test('high tier caps the lists and drops fields that add nothing', () => {
   assert.equal(ctx.facts.kycAmlIntensity, 'high');
 });
 
-test('high tier keeps crypto when it is true', () => {
+test('high tier keeps crypto only when true, and KYC intensity only when high (any case)', () => {
   const ctx = toGtmContext({ ...base, isCryptoRelated: true, kycAmlIntensity: 'low' });
   if (ctx.tier !== 'high') return assert.fail('expected high tier');
   assert.equal(ctx.facts.isCryptoRelated, true);
   assert.equal(ctx.facts.kycAmlIntensity, undefined);
-});
-
-test('KYC intensity is matched case-insensitively', () => {
-  const ctx = toGtmContext({ ...base, kycAmlIntensity: 'High' });
-  if (ctx.tier !== 'high') return assert.fail('expected high tier');
-  assert.equal(ctx.facts.kycAmlIntensity, 'high');
+  const upper = toGtmContext({ ...base, kycAmlIntensity: 'High' });
+  if (upper.tier !== 'high') return assert.fail('expected high tier');
+  assert.equal(upper.facts.kycAmlIntensity, 'high');
 });

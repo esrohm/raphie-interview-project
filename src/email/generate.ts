@@ -1,13 +1,6 @@
-import type { GtmContext } from '../companyAnalysis/confidence.ts';
-import { applyMechanicalFixes } from './fixes.ts';
-import { buildPrompt, firstName, TONE_GUIDES, type EmailRequest, type Prompt } from './prompt.ts';
-import { checkEmail, checkRequiredContent, type Violation } from './rules.ts';
-
-// Anything that can turn a prompt into text. The OpenAI version lives in
-// openaiModel.ts. Keeping it this small means tests can swap in a fake.
-export interface TextModel {
-  complete(prompt: Prompt): Promise<string>;
-}
+import type { Prompt, TextModel } from './model.ts';
+import { buildPrompt, firstName, TONE_GUIDES, type CompanyContext, type EmailRequest } from './prompt.ts';
+import { checkEmail, checkRequiredContent, checkTone, type Violation } from './rules.ts';
 
 export type GenerateResult =
   | { status: 'ok'; email: string; attempts: number }
@@ -16,7 +9,9 @@ export type GenerateResult =
   | { status: 'needs_review'; email: string; violations: Violation[]; attempts: number };
 
 // Two rounds of "please fix these" is usually enough. Past that the model
-// tends to just shuffle the problem around, and each call adds a few seconds.
+// tends to shuffle the problem around. There's deliberately no find-and-replace
+// fallback after this: swapping an em dash for a comma just makes a comma
+// splice, which the prompt itself forbids. A human fixes it instead.
 const MAX_REPAIRS = 2;
 
 /**
@@ -64,12 +59,16 @@ Rewrite it so it fixes those problems. Keep everything else as close to the draf
 
 export async function generateEmail(
   req: EmailRequest,
-  gtm: GtmContext,
+  context: CompanyContext,
   model: TextModel,
 ): Promise<GenerateResult> {
-  const prompt = buildPrompt(req, gtm);
+  const prompt = buildPrompt(req, context);
   const expected = { firstName: firstName(req.recipientName), companyName: req.companyName };
-  const findViolations = (email: string) => [...checkEmail(email), ...checkRequiredContent(email, expected)];
+  const findViolations = (email: string) => [
+    ...checkEmail(email),
+    ...checkRequiredContent(email, expected),
+    ...checkTone(email, req.tone),
+  ];
   const { signOff } = TONE_GUIDES[req.tone];
   const tidy = (raw: string) => normalizeSignOff(cleanModelOutput(raw), signOff);
 
@@ -81,11 +80,6 @@ export async function generateEmail(
     email = tidy(await model.complete(repairPrompt(prompt, email, violations)));
     violations = findViolations(email);
     attempts++;
-  }
-
-  if (violations.length > 0) {
-    email = applyMechanicalFixes(email);
-    violations = findViolations(email);
   }
 
   return violations.length === 0

@@ -21,8 +21,7 @@ export interface CompanyAnalysis {
   supportMotion?: string;
   isCryptoRelated?: boolean;
   kycAmlIntensity?: string;
-  // not in the brief's docs but the endpoint returns them, and they're
-  // honestly the most useful fields for the email
+  // not in the brief's docs, but the endpoint returns them and they're the most useful
   likelyTicketDrivers: string[];
   complianceThemes: string[];
   confidence: number;
@@ -113,8 +112,6 @@ export async function fetchCompanyAnalysis(
       return { ok: false, reason: `endpoint returned ${res.status}` };
     }
 
-    // Read the body once as text and parse it ourselves. A fetch body can only
-    // be consumed once, so calling res.json() after res.text() would always throw.
     const raw = await res.text();
     if (process.env.DEBUG) console.error('[company-analysis] raw response:', raw);
 

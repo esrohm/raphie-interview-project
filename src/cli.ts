@@ -5,8 +5,9 @@ import { fetchCompanyAnalysis, type AnalysisResult } from './companyAnalysis/cli
 import { toGtmContext, type GtmContext } from './companyAnalysis/confidence.ts';
 import { loadConfig } from './config.ts';
 import { generateEmail } from './email/generate.ts';
-import { createOpenAIModel } from './email/openaiModel.ts';
-import { buildPrompt, type EmailRequest } from './email/prompt.ts';
+import { createOpenAIModel } from './email/model.ts';
+import { buildPrompt, type CompanyContext, type EmailRequest } from './email/prompt.ts';
+import { classifySegment, resolveSegment } from './email/segment.ts';
 import {
   parseCompanyName,
   parseDescription,
@@ -31,8 +32,7 @@ Asks for anything you don't pass as a flag.
                  model gets told about this company)
   -h, --help     show this message`;
 
-// exit codes, so a script calling this can tell "worked" from "worked but
-// someone needs to look at it"
+// so a script can tell "worked" from "worked, but a human needs to look"
 const EXIT_OK = 0;
 const EXIT_ERROR = 1;
 const EXIT_NEEDS_REVIEW = 2;
@@ -160,23 +160,31 @@ async function main(): Promise<number> {
     readline?.close();
   }
 
-  log(`\nLooking up ${req.companyName}...`);
-  const lookup = await fetchCompanyAnalysis(req.companyName);
-  const gtm = toGtmContext(lookup.ok ? lookup.analysis : null);
-  log(describeLookup(req.companyName, lookup, gtm));
+  const model = createOpenAIModel({ apiKey: config.openaiApiKey, model: config.openaiModel });
 
-  if (flags['show-prompt']) {
-    // Only the per-email half. The instructions (rules, tone guide, style
-    // examples) are the same every time and would just bury the interesting
-    // part, which is how the description and helper data got turned into
-    // guidance. generateEmail builds the same prompt internally, it's pure.
-    const divider = '-'.repeat(60);
-    log(`\n${divider}\nPrompt input:\n\n${buildPrompt(req, gtm).input}\n${divider}\n`);
+  // The helper takes 4 to 12 seconds, so classifying the company in parallel
+  // costs no extra wait.
+  log(`\nLooking up ${req.companyName}...`);
+  const [lookup, classification] = await Promise.all([
+    fetchCompanyAnalysis(req.companyName),
+    classifySegment(req.description, model),
+  ]);
+  const gtm = toGtmContext(lookup.ok ? lookup.analysis : null);
+  const context: CompanyContext = { gtm, segment: resolveSegment(classification, gtm) };
+  log(describeLookup(req.companyName, lookup, gtm));
+  if (!classification.ok) {
+    log(`Couldn't classify the company type (${classification.reason}), using the helper's guess.`);
   }
 
-  log(`Writing the email with ${config.openaiModel}...`);
-  const model = createOpenAIModel({ apiKey: config.openaiApiKey, model: config.openaiModel });
-  const result = await generateEmail(req, gtm, model);
+  if (flags['show-prompt']) {
+    // Only the per-email half. The instructions are the same every time and
+    // would bury the part that shows how this company got turned into guidance.
+    const divider = '-'.repeat(60);
+    log(`\n${divider}\nPrompt input:\n\n${buildPrompt(req, context).input}\n${divider}\n`);
+  }
+
+  log(`Writing the email (segment: ${context.segment}) with ${config.openaiModel}...`);
+  const result = await generateEmail(req, context, model);
 
   log();
   process.stdout.write(`${result.email}\n`);

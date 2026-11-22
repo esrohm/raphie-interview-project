@@ -1,4 +1,6 @@
 import type { GtmContext } from '../companyAnalysis/confidence.ts';
+import type { Prompt } from './model.ts';
+import type { Segment } from './segment.ts';
 
 export type Tone = 'direct' | 'warm';
 
@@ -9,75 +11,9 @@ export interface EmailRequest {
   tone: Tone;
 }
 
-export interface Prompt {
-  // stable stuff: who we are, the rules, tone, style references
-  instructions: string;
-  // per-email stuff: recipient, company, and what we know about them
-  input: string;
-}
-
-// What kind of company we're writing to. This drives the angle of the email
-// more than anything else, since an operator's support problems (players,
-// withdrawals, game day spikes) look nothing like an affiliate's.
-export type Segment = 'operator' | 'supplier' | 'affiliate' | 'payments' | 'unknown';
-
-// Checked in order, and order matters. B2B companies describe themselves by
-// who they sell to ("a fraud vendor for sportsbooks", "a KYC platform used by
-// operators"), so mentioning operators doesn't make you one. Anything that
-// sounds like it *serves* operators gets caught as a supplier before the
-// operator keywords get a chance.
-const OPERATOR_WORDS = '(operators?|sportsbooks?|casinos?|bookmakers?|brands|igaming)';
-
-const SEGMENT_KEYWORDS: Array<[Segment, RegExp]> = [
-  ['payments', /\b(payments?|psp|payouts? provider|processor|acquir\w*|on-?ramps?|e-?wallets?)\b/i],
-  ['affiliate', /\b(affiliates?|comparison site|review site|tipsters?|lead gen\w*|media brand)\b/i],
-  [
-    'supplier',
-    /\b(b2b|suppliers?|vendors?|tooling|saas|white[- ]label|aggregator|odds (feed|provider)|data provider|game (studio|provider)|powers|powering)\b/i,
-  ],
-  // "for US sportsbooks", "serving online casinos", "used by iGaming operators"
-  [
-    'supplier',
-    new RegExp(`\\b(for|serving|used by|sold to|licensed to)\\s+(\\S+\\s+){0,2}${OPERATOR_WORDS}\\b`, 'i'),
-  ],
-  [
-    'operator',
-    /\b(sportsbooks?|casinos?|operators?|bookmakers?|betting (app|site|brand)|lotter(y|ies)|igaming brand)\b/i,
-  ],
-  // weak signals, only used when nothing above matched
-  ['supplier', /\b(provider|platform|software|solutions?|api)\b/i],
-];
-
-// The helper's labels don't map 1:1 onto ours ("platform" covers a lot), so
-// this is a loose translation.
-const HELPER_TYPE_TO_SEGMENT: Record<string, Segment> = {
-  operator: 'operator',
-  platform: 'supplier',
-  supplier: 'supplier',
-  b2b: 'supplier',
-  vendor: 'supplier',
-  affiliate: 'affiliate',
-  payments: 'payments',
-  psp: 'payments',
-};
-
-/**
- * The description wins when it clearly says what the company is. A person
- * wrote it, and the helper sometimes gets this wrong (it called ApexPay, a
- * payments provider, a "platform" even at 0.8 confidence). The helper only
- * breaks the tie when the description is vague, and only at high confidence.
- * The segment angle is written as fact ("This is a B2B supplier..."), so a
- * medium-confidence guess here ends up stated flatly in the email. At medium
- * the company type still reaches the prompt, just in the hedged research part.
- */
-export function inferSegment(description: string, gtm: GtmContext): Segment {
-  for (const [segment, pattern] of SEGMENT_KEYWORDS) {
-    if (pattern.test(description)) return segment;
-  }
-  if (gtm.tier === 'high' && gtm.facts.companyType) {
-    return HELPER_TYPE_TO_SEGMENT[gtm.facts.companyType.toLowerCase()] ?? 'unknown';
-  }
-  return 'unknown';
+export interface CompanyContext {
+  gtm: GtmContext;
+  segment: Segment;
 }
 
 // The angle for each kind of company: who's actually filing the tickets, and
@@ -107,7 +43,9 @@ export const TONE_GUIDES: Record<Tone, { guide: string; signOff: string }> = {
   },
   warm: {
     guide:
-      "Warm: open with one short friendly line, then get into it. It's a cold email, so the opener can't assume they know us or have read anything. Conversational and human, never gushing. Around 110 to 150 words.",
+      "Warm: the first sentence after the greeting is a short, friendly, human line to them, the way you'd open with someone you'd like to get to know. " +
+      "It is not a sales hook, not a point about their support problems, and not about Raphie or why you're writing. Introduce Raphie in the next sentence. " +
+      "It's a cold email, so the opener can't assume they know us, have met us, or have read anything. Conversational and human, never gushing. Around 110 to 150 words.",
     signOff: 'Warm regards, Raphie',
   },
 };
@@ -191,8 +129,7 @@ function describeGtm(gtm: GtmContext): string {
   ].join('\n');
 }
 
-export function buildPrompt(req: EmailRequest, gtm: GtmContext): Prompt {
-  const segment = inferSegment(req.description, gtm);
+export function buildPrompt(req: EmailRequest, { gtm, segment }: CompanyContext): Prompt {
   const tone = TONE_GUIDES[req.tone];
 
   const instructions = `You write cold outreach emails for Raphie, a company that automates customer support for businesses in iGaming and sports betting.
@@ -214,7 +151,7 @@ Hard rules. Breaking any of these means the email gets thrown out:
 - Two sentences in a row must never start with the same word. Watch out for "Raphie" and "We" back to back.
 - Keep every sentence under 25 words.
 
-Avoid the usual cold email clichés: "I hope this email finds you well", "in today's fast-paced world", "game-changer", "revolutionize", "leverage", "seamless".
+Avoid the usual cold email clichés: "I hope this email finds you well", "Nice to meet you" (you haven't met), "in today's fast-paced world", "game-changer", "revolutionize", "leverage", "seamless".
 Also avoid stock framings like "X sits in a support-heavy spot" or "X sits right in the middle of". Say the specific thing about their support instead.
 Do not invent numbers, customers, or results.
 

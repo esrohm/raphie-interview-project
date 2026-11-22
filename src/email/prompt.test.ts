@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { GtmContext } from '../companyAnalysis/confidence.ts';
-import { buildPrompt, firstName, inferSegment, STYLE_EXAMPLES, type EmailRequest } from './prompt.ts';
-import { checkEmail } from './rules.ts';
+import { buildPrompt, firstName, STYLE_EXAMPLES, type EmailRequest } from './prompt.ts';
+import { checkEmail, checkTone } from './rules.ts';
 
 const NONE: GtmContext = { tier: 'none', reason: 'test' };
 
@@ -33,65 +33,44 @@ const riverline: EmailRequest = {
   tone: 'direct',
 };
 
-test('style examples pass our own rules', () => {
+const inputFor = (gtm: GtmContext, req = riverline) => buildPrompt(req, { gtm, segment: 'operator' }).input;
+
+test('style examples pass our own rules, including the warm opener', () => {
   // if these break the rules, we're teaching the model to break them too
-  for (const example of STYLE_EXAMPLES) {
-    assert.deepEqual(checkEmail(example), []);
-  }
+  for (const example of STYLE_EXAMPLES) assert.deepEqual(checkEmail(example), []);
+  assert.deepEqual(checkTone(STYLE_EXAMPLES[1] ?? '', 'warm'), []);
 });
 
-test('segment comes from the description first', () => {
-  const apexPay = 'A payments provider for iGaming operators that supports card, ACH, and crypto on-ramps';
-  assert.equal(inferSegment(apexPay, HIGH), 'payments');
-  assert.equal(inferSegment('A B2B platform that powers sportsbooks', NONE), 'supplier');
-  assert.equal(inferSegment('An affiliate site comparing casino bonuses', NONE), 'affiliate');
-  assert.equal(inferSegment('An online casino brand in Ontario', NONE), 'operator');
-});
-
-test('segment falls back to the helper when the description is vague', () => {
-  assert.equal(inferSegment('A fast growing company in Malta', HIGH), 'operator');
-  assert.equal(inferSegment('A fast growing company in Malta', NONE), 'unknown');
-});
-
-test('a medium-confidence helper guess does not decide the segment', () => {
-  // live run: "A small company based in Malta" at 0.41 got an email saying
-  // "we help B2B suppliers like Lumen Labs" as if it were known
-  assert.equal(inferSegment('A small company based in Malta', MEDIUM), 'unknown');
-  // but the guess still shows up in the hedged research section
-  const { input } = buildPrompt({ ...riverline, description: 'A small company based in Malta' }, MEDIUM);
-  assert.match(input, /Angle: The type of company is not clear/);
-  assert.match(input, /moderate confidence[\s\S]*Company type: operator/);
-});
-
-test('tone controls the guidance and sign-off', () => {
-  assert.match(buildPrompt(riverline, NONE).instructions, /Sign off exactly with: Best, Raphie/);
-  assert.match(
-    buildPrompt({ ...riverline, tone: 'warm' }, NONE).instructions,
-    /Sign off exactly with: Warm regards, Raphie/,
-  );
-});
-
-test('input has the recipient, company, and description', () => {
-  const { input } = buildPrompt(riverline, NONE);
+test('input has the recipient, company, description, and segment angle', () => {
+  const input = inputFor(NONE);
   assert.match(input, /first name: Jane/);
   assert.match(input, /Company: Riverline Sportsbook/);
   assert.match(input, /high withdrawal volume/);
   assert.match(input, /B2C operator/);
+  assert.match(buildPrompt(riverline, { gtm: NONE, segment: 'supplier' }).input, /B2B supplier/);
+});
+
+test('tone controls the guidance and sign-off', () => {
+  const direct = buildPrompt(riverline, { gtm: NONE, segment: 'operator' }).instructions;
+  const warm = buildPrompt({ ...riverline, tone: 'warm' }, { gtm: NONE, segment: 'operator' }).instructions;
+  assert.match(direct, /Sign off exactly with: Best, Raphie/);
+  assert.match(warm, /Sign off exactly with: Warm regards, Raphie/);
+  assert.match(warm, /not about Raphie/);
 });
 
 test('no helper context means no research section at all', () => {
-  assert.doesNotMatch(buildPrompt(riverline, NONE).input, /Background research/);
+  assert.doesNotMatch(inputFor(NONE), /Background research/);
 });
 
 test('medium confidence is hedged and leaves out the detailed fields', () => {
-  const { input } = buildPrompt(riverline, MEDIUM);
-  assert.match(input, /moderate confidence/);
+  const input = inputFor(MEDIUM);
+  assert.match(input, /moderate confidence[\s\S]*Company type: operator/);
   assert.match(input, /trust the description/);
   assert.doesNotMatch(input, /Regions:|Compliance themes:/);
 });
 
 test('high confidence includes regions and compliance, humanized', () => {
-  const { input } = buildPrompt(riverline, HIGH);
+  const input = inputFor(HIGH);
   assert.match(input, /high confidence/);
   assert.match(input, /account access/);
   assert.match(input, /state-by-state/);
@@ -103,27 +82,4 @@ test('high confidence includes regions and compliance, humanized', () => {
 test('firstName handles extra whitespace', () => {
   assert.equal(firstName('  Alex   Gould '), 'Alex');
   assert.equal(firstName('Cher'), 'Cher');
-});
-
-test('B2B vendors that mention who they sell to are suppliers, not operators', () => {
-  // these all mention sportsbooks/casinos/operators as customers, and used to
-  // get classified as operators because of it
-  for (const description of [
-    'A fraud and risk scoring vendor for sportsbooks',
-    'A compliance and responsible gambling tooling company serving online casinos',
-    'A KYC and identity verification platform used by iGaming operators',
-    'A geolocation compliance provider for US sportsbooks',
-  ]) {
-    assert.equal(inferSegment(description, NONE), 'supplier', description);
-  }
-});
-
-test('operators that mention platforms or customers are still operators', () => {
-  for (const description of [
-    'A US sportsbook running its own in-house platform',
-    'A casino operator for players in New Jersey',
-    'A betting app for UK punters',
-  ]) {
-    assert.equal(inferSegment(description, NONE), 'operator', description);
-  }
 });

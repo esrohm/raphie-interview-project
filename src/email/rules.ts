@@ -1,6 +1,7 @@
 // Checks a generated email against Raphie's "don't sound like a bot" rules.
-// The model gets told about all of these in the prompt too, but it doesn't
-// always listen, so we verify the output here and never just trust it.
+// The prompt states them too, but the model doesn't always listen.
+
+import type { Tone } from './prompt.ts';
 
 const MAX_SENTENCE_WORDS = 30;
 const MAX_EXCLAMATIONS = 1;
@@ -15,7 +16,8 @@ export type RuleId =
   | 'long_sentence'
   | 'missing_recipient'
   | 'missing_company'
-  | 'missing_call_ask';
+  | 'missing_call_ask'
+  | 'warm_opener';
 
 export interface Violation {
   rule: RuleId;
@@ -66,7 +68,6 @@ function preview(sentence: string, max = 8): string {
   return w.length > max ? `${w.slice(0, max).join(' ')}...` : sentence;
 }
 
-/** Returns every rule the email breaks. Empty array means it's good to go. */
 export function checkEmail(email: string): Violation[] {
   const violations: Violation[] = [];
   const sentences = splitSentences(email);
@@ -78,8 +79,7 @@ export function checkEmail(email: string): Violation[] {
     });
   }
 
-  // \b so we catch "Fantastic" and "fantastically" but not some unrelated word
-  // that just happens to contain it (there aren't many, but still)
+  // catches "Fantastic" and "fantastically" too
   if (/\bfantastic/i.test(email)) {
     violations.push({ rule: 'banned_word', message: 'Uses the word "fantastic".' });
   }
@@ -146,10 +146,8 @@ function containsPhrase(haystack: string, phrase: string): boolean {
 }
 
 /**
- * The brief requires the recipient's name and the company's name. The model
- * nearly always includes them, but "nearly always" isn't good enough for
- * something that goes out to real prospects. Case-insensitive so "BIG BET
- * SPORTS" typed into the CLI still matches "Big Bet Sports" in the email.
+ * The brief's required content. The model nearly always includes it, but
+ * "nearly always" isn't good enough for email that goes to real prospects.
  */
 export function checkRequiredContent(
   email: string,
@@ -168,13 +166,42 @@ export function checkRequiredContent(
       message: `Never mentions the company by its full name ("${expected.companyName}").`,
     });
   }
-  // Unlike the value props, the ask is pretty much always worded the same few
-  // ways, so a keyword check is reliable enough to enforce here.
-  if (!/\b(call|chat|meet|meeting|conversation|talk|demo)\b/i.test(email)) {
+  // The ask has to actually propose meeting, as a question ("open to a short
+  // call?") or an offer ("happy to set up a call"). Just having "talk" or
+  // "call" somewhere in the body doesn't count. Unlike the value props, the
+  // ask is nearly always worded these few ways, so keywords are reliable here.
+  const asksToMeet = splitSentences(email).some(
+    (s) =>
+      /\b(call|chat|meet|meeting|conversation|talk|demo)\b/i.test(s) &&
+      (s.endsWith('?') || /\b(happy to|glad to|love to|let's|set up|hop on|jump on|grab|book)\b/i.test(s)),
+  );
+  if (!asksToMeet) {
     violations.push({
       rule: 'missing_call_ask',
       message: 'Never suggests meeting up or hopping on a short call.',
     });
   }
   return violations;
+}
+
+const GREETING = /^(hi|hello|hey|dear)\b[^.!?]*,$/i;
+
+/**
+ * Warm emails have to open with a friendly line about them before the pitch,
+ * like the brief's warm example. Without this check the model kept going
+ * straight to "I'm reaching out from Raphie", and the two tones read the same.
+ */
+export function checkTone(email: string, tone: Tone): Violation[] {
+  if (tone !== 'warm') return [];
+  const sentences = splitSentences(email);
+  const opener = GREETING.test(sentences[0] ?? '') ? sentences[1] : sentences[0];
+  if (opener && /raphie|reaching out/i.test(opener)) {
+    return [
+      {
+        rule: 'warm_opener',
+        message: `Warm tone: the first sentence after the greeting should be a short friendly line about them, not about Raphie or why you're writing. Got: "${preview(opener)}"`,
+      },
+    ];
+  }
+  return [];
 }

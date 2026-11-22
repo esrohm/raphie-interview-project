@@ -14,16 +14,18 @@ import { fetchCompanyAnalysis } from '../src/companyAnalysis/client.ts';
 import { toGtmContext } from '../src/companyAnalysis/confidence.ts';
 import { loadConfig } from '../src/config.ts';
 import { generateEmail } from '../src/email/generate.ts';
-import { createOpenAIModel } from '../src/email/openaiModel.ts';
-import { inferSegment, type EmailRequest } from '../src/email/prompt.ts';
+import { createOpenAIModel } from '../src/email/model.ts';
+import type { EmailRequest } from '../src/email/prompt.ts';
+import { classifySegment, resolveSegment, type Segment } from '../src/email/segment.ts';
 import { splitSentences } from '../src/email/rules.ts';
 
 // The two examples from the brief, the CLI example from the brief, plus one of
 // each segment the brief mentions that the examples don't cover, and a vague
 // one to exercise the low-information path.
-const CASES: Array<{ label: string; req: EmailRequest }> = [
+const CASES: Array<{ label: string; expected: Segment; req: EmailRequest }> = [
   {
     label: 'operator (brief #1)',
+    expected: 'operator',
     req: {
       recipientName: 'Jane Doe',
       companyName: 'Riverline Sportsbook',
@@ -34,6 +36,7 @@ const CASES: Array<{ label: string; req: EmailRequest }> = [
   },
   {
     label: 'payments (brief #2)',
+    expected: 'payments',
     req: {
       recipientName: 'Jane Doe',
       companyName: 'ApexPay Gaming',
@@ -44,6 +47,7 @@ const CASES: Array<{ label: string; req: EmailRequest }> = [
   },
   {
     label: 'operator (brief CLI example)',
+    expected: 'operator',
     req: {
       recipientName: 'Alex Gould',
       companyName: 'Big Bet Sports',
@@ -53,6 +57,7 @@ const CASES: Array<{ label: string; req: EmailRequest }> = [
   },
   {
     label: 'B2B supplier',
+    expected: 'supplier',
     req: {
       recipientName: 'Priya Natarajan',
       companyName: 'Northstar Odds',
@@ -63,6 +68,7 @@ const CASES: Array<{ label: string; req: EmailRequest }> = [
   },
   {
     label: 'affiliate',
+    expected: 'affiliate',
     req: {
       recipientName: 'Tom Becker',
       companyName: 'BetCompare Media',
@@ -72,10 +78,9 @@ const CASES: Array<{ label: string; req: EmailRequest }> = [
     },
   },
   {
-    // the brief lists risk/compliance as part of the market, and these are
-    // easy to misread as operators since they describe themselves by their
-    // sportsbook customers
+    // easy to misread as an operator, since it names its sportsbook customers
     label: 'risk/compliance vendor',
+    expected: 'supplier',
     req: {
       recipientName: 'Dana Whitfield',
       companyName: 'Sentinel Risk',
@@ -86,6 +91,7 @@ const CASES: Array<{ label: string; req: EmailRequest }> = [
   },
   {
     label: 'vague description',
+    expected: 'unknown',
     req: {
       recipientName: 'Sam Ortiz',
       companyName: 'Lumen Labs',
@@ -151,12 +157,16 @@ async function main(): Promise<number> {
   // Cases run in parallel, runs of the same case run one after another. That
   // keeps it reasonably quick without hammering either API.
   const reports = await Promise.all(
-    CASES.map(async ({ label, req }) => {
+    CASES.map(async ({ label, expected, req }) => {
       const caseReports: RunReport[] = [];
       for (let i = 0; i < runs; i++) {
-        const lookup = await fetchCompanyAnalysis(req.companyName);
+        const [lookup, classification] = await Promise.all([
+          fetchCompanyAnalysis(req.companyName),
+          classifySegment(req.description, model),
+        ]);
         const gtm = toGtmContext(lookup.ok ? lookup.analysis : null);
-        const result = await generateEmail(req, gtm, model);
+        const segment = resolveSegment(classification, gtm);
+        const result = await generateEmail(req, { gtm, segment }, model);
 
         if (values.show) {
           console.log(`\n----- ${label} (run ${i + 1}) -----\n${result.email}`);
@@ -166,7 +176,7 @@ async function main(): Promise<number> {
           case: label,
           tone: req.tone,
           helper: lookup.ok ? `${gtm.tier} (${lookup.analysis.confidence.toFixed(2)})` : 'failed',
-          segment: inferSegment(req.description, gtm),
+          segment: segment === expected ? segment : `${segment} (expected ${expected})`,
           status: result.status,
           drafts: result.attempts,
           words: countWords(result.email),
@@ -190,7 +200,9 @@ async function main(): Promise<number> {
       `${flat.length - firstTry - needsReview} fixed by repair, ${needsReview} still need review.`,
   );
   const allValueProps = flat.filter((r) => r.valueProps === '4/4').length;
+  const rightSegment = flat.filter((r) => !r.segment.includes('expected')).length;
   console.log(`${allValueProps}/${flat.length} cover all four value props.`);
+  console.log(`${rightSegment}/${flat.length} got the expected segment.`);
 
   return needsReview > 0 ? 2 : 0;
 }
