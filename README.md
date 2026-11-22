@@ -30,6 +30,18 @@ Exit codes: 0 means it's good to send, 2 means it printed a draft that still bre
 
 Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, and `npm run check`, which runs all of them (it's what CI runs).
 
+### Eval
+
+The unit tests use a fake model, so they can't tell you if a prompt change made the emails better or worse. `npm run eval` runs six company profiles (both brief examples, the brief's CLI example, a B2B supplier, an affiliate, and a deliberately vague one) through the real helper and OpenAI, and prints a table: helper tier, detected segment, how many drafts it took, word counts, and any rules still broken.
+
+```
+npm run eval                 # one run per case
+npm run eval -- --runs 3     # output varies, so more runs gives a better picture
+npm run eval -- --show       # print the emails too
+```
+
+It makes real API calls, so it's not part of `check` or CI.
+
 ## How it works
 
 1. Look up the company on the helper endpoint (20s timeout, 503s get retried twice with backoff).
@@ -63,7 +75,7 @@ The cutoffs are judgment calls. A couple of things I noticed while testing:
 
 ## With more time
 
-- An eval script that runs a bunch of company profiles through the real model and reports rule pass rates and how often it needed repairs. Right now the tests use a fake model, so prompt changes are only checked by eye.
+- Grade the eval output on more than the hard rules, e.g. an LLM judge checking that each email has all the required pieces and actually sounds like it fits the segment. Right now that part is still read by eye with `--show`.
 - Cache the helper responses per company, partly for speed and partly because the confidence moves around between calls.
 - Better segment detection. Keywords work for the obvious cases but something like "a KYC vendor that also runs a sportsbook" would need more than that.
 - Let the user see and edit the draft in the CLI and regenerate with feedback ("shorter", "mention the World Cup").

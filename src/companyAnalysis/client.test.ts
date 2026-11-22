@@ -88,3 +88,9 @@ test('a timeout fails fast without retrying', async () => {
   assert.deepEqual(result, { ok: false, reason: 'timed out after 50ms' });
   assert.equal(state.calls, 1);
 });
+
+test('a 200 with a non-JSON body fails cleanly', async () => {
+  const { impl } = fakeFetch([new Response('<html>oops</html>', { status: 200 })]);
+  const result = await fetchCompanyAnalysis('x', { fetchImpl: impl, sleep: noSleep });
+  assert.deepEqual(result, { ok: false, reason: 'response was not valid JSON' });
+});

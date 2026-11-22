@@ -113,13 +113,14 @@ export async function fetchCompanyAnalysis(
       return { ok: false, reason: `endpoint returned ${res.status}` };
     }
 
-    // handy when the helper sends back something odd, run with DEBUG=1 to see it
+    // Read the body once as text and parse it ourselves. A fetch body can only
+    // be consumed once, so calling res.json() after res.text() would always throw.
     const raw = await res.text();
     if (process.env.DEBUG) console.error('[company-analysis] raw response:', raw);
 
     let body: unknown;
     try {
-      body = await res.json();
+      body = JSON.parse(raw);
     } catch {
       return { ok: false, reason: 'response was not valid JSON' };
     }
