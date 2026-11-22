@@ -107,6 +107,8 @@ test('warm emails open with a friendly line before the pitch', () => {
   // greeting and opener on the same line
   assert.deepEqual(checkTone("Hi Jane, I'm reaching out from Raphie.", 'warm').length, 1);
   assert.deepEqual(checkTone("Hi Jane, hope you're well. I'm with Raphie.", 'warm'), []);
+  // an exclamation greeting on its own line still counts as the greeting
+  assert.deepEqual(checkTone("Hi Jane!\nI'm reaching out from Raphie.", 'warm').length, 1);
   // direct tone gets to the point, so this rule doesn't apply
   assert.deepEqual(checkTone(CLEAN, 'direct'), []);
 });

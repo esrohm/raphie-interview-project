@@ -184,7 +184,8 @@ export function checkRequiredContent(
   return violations;
 }
 
-const GREETING = /^(hi|hello|hey|dear)\b[^.!?]*,$/i;
+// "Hi Jane," or "Hi Jane!" on a line of its own
+const GREETING = /^(hi|hello|hey|dear)\b[^.!?]*[,!]$/i;
 
 /**
  * Warm emails have to open with a friendly line about them before the pitch,

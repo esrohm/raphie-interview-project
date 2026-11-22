@@ -94,3 +94,12 @@ test('a 200 with a non-JSON body fails cleanly', async () => {
   const result = await fetchCompanyAnalysis('x', { fetchImpl: impl, sleep: noSleep });
   assert.deepEqual(result, { ok: false, reason: 'response was not valid JSON' });
 });
+
+test('a timeout while reading the body falls back instead of throwing', async () => {
+  const body = new ReadableStream({
+    start: (controller) => controller.error(new DOMException('The operation timed out.', 'TimeoutError')),
+  });
+  const { impl } = fakeFetch([new Response(body, { status: 200 })]);
+  const result = await fetchCompanyAnalysis('x', { fetchImpl: impl, sleep: noSleep, timeoutMs: 50 });
+  assert.deepEqual(result, { ok: false, reason: 'timed out after 50ms' });
+});

@@ -173,7 +173,9 @@ async function main(): Promise<number> {
   const context: CompanyContext = { gtm, segment: resolveSegment(classification, gtm) };
   log(describeLookup(req.companyName, lookup, gtm));
   if (!classification.ok) {
-    log(`Couldn't classify the company type (${classification.reason}), using the helper's guess.`);
+    // resolveSegment only trusts the helper's type at high confidence
+    const fallback = gtm.tier === 'high' ? "the helper's guess" : 'a general angle';
+    log(`Couldn't classify the company type (${classification.reason}), using ${fallback}.`);
   }
 
   if (flags['show-prompt']) {

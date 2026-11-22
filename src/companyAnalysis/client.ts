@@ -86,6 +86,14 @@ export async function fetchCompanyAnalysis(
   const { fetchImpl = fetch, sleep = defaultSleep, timeoutMs = TIMEOUT_MS } = options;
 
   for (let attempt = 0; ; attempt++) {
+    const failed = (err: unknown): AnalysisResult => {
+      const timedOut = err instanceof Error && err.name === 'TimeoutError';
+      return {
+        ok: false,
+        reason: timedOut ? `timed out after ${timeoutMs}ms` : `request failed: ${String(err)}`,
+      };
+    };
+
     let res: Response;
     try {
       res = await fetchImpl(ENDPOINT, {
@@ -95,11 +103,7 @@ export async function fetchCompanyAnalysis(
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
-      const timedOut = err instanceof Error && err.name === 'TimeoutError';
-      return {
-        ok: false,
-        reason: timedOut ? `timed out after ${timeoutMs}ms` : `request failed: ${String(err)}`,
-      };
+      return failed(err);
     }
 
     const retryDelay = RETRY_DELAYS_MS[attempt];
@@ -112,7 +116,14 @@ export async function fetchCompanyAnalysis(
       return { ok: false, reason: `endpoint returned ${res.status}` };
     }
 
-    const raw = await res.text();
+    // The timeout covers reading the body too, and a slow body or dropped
+    // connection here would otherwise crash the CLI instead of falling back.
+    let raw: string;
+    try {
+      raw = await res.text();
+    } catch (err) {
+      return failed(err);
+    }
     if (process.env.DEBUG) console.error('[company-analysis] raw response:', raw);
 
     let body: unknown;
