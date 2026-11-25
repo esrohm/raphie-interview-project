@@ -17,7 +17,7 @@ import type { CompanyAnalysis } from './client.ts';
 //   < 0.4        none: ignore it completely and write from the description.
 //
 // The cutoffs are judgment calls, not something I measured. When I tested,
-// well known names came back at 0.77 to 0.99 and a made-up company at 0.14
+// well known names came back at 0.72 to 0.99 and a made-up company at 0.14
 // labelled "general_business". ApexPay came back as a "platform" at anywhere
 // from 0.62 to 0.80 across calls, even though it's a payments provider. That
 // spread is why the description decides the company type whenever it's clear

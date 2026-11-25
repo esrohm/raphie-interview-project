@@ -19,9 +19,9 @@ import type { EmailRequest } from '../src/email/prompt.ts';
 import { classifySegment, resolveSegment, type Segment } from '../src/email/segment.ts';
 import { splitSentences } from '../src/email/rules.ts';
 
-// The two examples from the brief, the CLI example from the brief, plus one of
-// each segment the brief mentions that the examples don't cover, and a vague
-// one to exercise the low-information path.
+// The two examples from the brief, the CLI example from the brief, one of each
+// segment the examples don't cover, a vendor that's easy to mistake for an
+// operator, and a vague one to exercise the low-information path.
 const CASES: Array<{ label: string; expected: Segment; req: EmailRequest }> = [
   {
     label: 'operator (brief #1)',
@@ -131,7 +131,8 @@ const VALUE_PROPS: Array<[string, RegExp]> = [
 function valuePropCoverage(email: string): string {
   const missing = VALUE_PROPS.filter(([, pattern]) => !pattern.test(email)).map(([name]) => name);
   const covered = VALUE_PROPS.length - missing.length;
-  return missing.length === 0 ? `${covered}/4` : `${covered}/4 (no ${missing.join(', ')})`;
+  const score = `${covered}/${VALUE_PROPS.length}`;
+  return missing.length === 0 ? score : `${score} (no ${missing.join(', ')})`;
 }
 
 async function main(): Promise<number> {
@@ -199,7 +200,7 @@ async function main(): Promise<number> {
     `\n${flat.length} emails: ${firstTry} clean on the first draft, ` +
       `${flat.length - firstTry - needsReview} fixed by repair, ${needsReview} still need review.`,
   );
-  const allValueProps = flat.filter((r) => r.valueProps === '4/4').length;
+  const allValueProps = flat.filter((r) => !r.valueProps.includes('no ')).length;
   const rightSegment = flat.filter((r) => !r.segment.includes('expected')).length;
   console.log(`${allValueProps}/${flat.length} cover all four value props.`);
   console.log(`${rightSegment}/${flat.length} got the expected segment.`);

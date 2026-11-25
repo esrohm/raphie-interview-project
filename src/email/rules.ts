@@ -188,8 +188,8 @@ export function checkRequiredContent(
 const GREETING = /^(hi|hello|hey|dear)\b[^.!?]*[,!]$/i;
 
 /**
- * Warm emails have to open with a friendly line about them before the pitch,
- * like the brief's warm example. Without this check the model kept going
+ * Warm emails have to open with a friendly line to them before the pitch,
+ * like the brief's warm example ("Hope you're doing well."). Without this check the model kept going
  * straight to "I'm reaching out from Raphie", and the two tones read the same.
  */
 export function checkTone(email: string, tone: Tone): Violation[] {
@@ -200,7 +200,7 @@ export function checkTone(email: string, tone: Tone): Violation[] {
     return [
       {
         rule: 'warm_opener',
-        message: `Warm tone: the first sentence after the greeting should be a short friendly line about them, not about Raphie or why you're writing. Got: "${preview(opener)}"`,
+        message: `Warm tone: the first sentence after the greeting should be a short friendly line to them, not about Raphie or why you're writing. Got: "${preview(opener)}"`,
       },
     ];
   }

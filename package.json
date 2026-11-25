@@ -12,8 +12,6 @@
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
     "eval": "node --env-file-if-exists=.env scripts/eval.ts"
   },
-  "author": "",
-  "license": "ISC",
   "type": "module",
   "engines": {
     "node": ">=22.18"
